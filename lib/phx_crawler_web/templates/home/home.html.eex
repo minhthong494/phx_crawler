@@ -1,0 +1,81 @@
+<div class="container">
+  <section class="row">
+    <div class="tabs">
+      <div class="tab">
+        <input type="radio" id="tab-1" name="tab-group-1" checked>
+        <label for="tab-1">From URL</label>
+        <div class="content">
+          <%= form_for @conn, Routes.home_path(@conn, :crawl_by_url), [as: :form_data], fn f -> %>
+          <%= text_input f, :url %>
+          <%= submit "Submit" %>
+        <% end %>
+      </div>
+    </div>
+    <div class="tab">
+      <input type="radio" id="tab-2" name="tab-group-1">
+      <label for="tab-2">Upload file</label>
+      <div class="content">
+        <%= form_for @conn, Routes.home_path(@conn, :crawl_by_url), [multipart: true], fn f -> %>
+        <%= file_input f, :file %>
+        <%= submit "Upload" %>
+      <% end %>
+    </div>
+  </div>
+</div>
+</section>
+<div>
+    <button onclick="to_with_param()">Export</button>
+    <script>
+
+      const url = document.getElementById('form_data_url').value;
+      function to_with_param() {
+        console.log('url = ', url);
+        return '/export?url=' + url;
+      }
+    </script>
+  </div>
+<section class="row">
+  <table>
+    <tr>
+      <th>#</th>
+      <th>thumnail</th>
+      <th>title</th>
+      <th>year</th>
+      <th>episodes</th>
+      <th>full_series</th>
+      <th>link</th>
+    </tr>
+    <%= for {movie, idx} <- @movies do %>
+      <tr>
+        <td><%= idx %></td>
+        <td class="thumnail"><img src="<%= movie.thumnail %>"></td>
+        <td><%= movie.title %></td>
+        <td><%= movie.year %></td>
+        <td><%= movie.number_of_episode %></td>
+        <td><%= if movie.full_series do %>
+              ✅
+            <% else %>
+              ❌
+            <% end %>
+        </td>
+        <td><a href="<%= movie.link %>"><%= movie.link %></a></td>
+      </tr>
+    <% end %>
+  </table>
+</section>
+<div class="row">
+  <div class="col"></div>
+  <div class="col">
+    <nav aria-label="Page navigation example" class="row">
+    <ul class="pagination">
+      <li class="page-item"><a class="page-link" href="#">Previous</a></li>
+      <li class="page-item"><a class="page-link" href="#">1</a></li>
+      <li class="page-item"><a class="page-link" href="#">2</a></li>
+      <li class="page-item"><a class="page-link" href="#">3</a></li>
+      <li class="page-item"><a class="page-link" href="#">Next</a></li>
+    </ul>
+  </nav>
+  </div>
+  <div class="col"></div>
+</div>
+</div>
