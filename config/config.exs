@@ -18,6 +18,30 @@ config :phx_crawler, PhxCrawlerWeb.Endpoint,
   pubsub_server: PhxCrawler.PubSub,
   live_view: [signing_salt: "faNudEwN"]
 
+config :cors_plug,
+[
+  origin: "*",
+  credentials: true,
+  max_age: 1_728_000,
+  headers: [
+    "Authorization",
+    "Content-Type",
+    "Accept",
+    "Origin",
+    "User-Agent",
+    "DNT",
+    "Cache-Control",
+    "X-Mx-ReqToken",
+    "Keep-Alive",
+    "X-Requested-With",
+    "If-Modified-Since",
+    "X-CSRF-Token"
+  ],
+  expose: ["x-total-items"],
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  send_preflight_response?: true
+]
+
 # Configures Elixir's Logger
 config :logger, :console,
   format: "$time $metadata[$level] $message\n",

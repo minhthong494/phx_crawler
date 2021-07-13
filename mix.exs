@@ -46,7 +46,8 @@ defmodule PhxCrawler.MixProject do
       {:jason, "~> 1.0"},
       {:plug_cowboy, "~> 2.0"},
       {:simple_crawler, git: "https://github.com/minhthong494/simple_crawler"},
-      {:corsica, "~> 1.1.3"}
+      {:corsica, "~> 1.1.3"},
+      {:cors_plug, "~> 2.0"},
     ]
   end
 
