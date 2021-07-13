@@ -1,14 +1,11 @@
 defmodule PhxCrawlerWeb.CrawlLogController do
   use PhxCrawlerWeb, :controller
   alias PhxCrawler.Repo
-  import Ecto.Query, only: [from: 2, limit: 2, offset: 2]
+  import Ecto.Query
 
   @limit 10
   @offset 0
   def retrieve(conn, %{"url" => url, "time" => time} = params) do
-    IO.inspect(conn)
-    IO.inspect(params)
-
     limit = params["limit"] || @limit
     offset = params["offset"] || @offset
     IO.puts("query params #{url} #{time} #{limit} #{offset} #{is_integer(limit)}")
@@ -22,8 +19,8 @@ defmodule PhxCrawlerWeb.CrawlLogController do
         offset: 30
       )
 
-    case PhxCrawler.Repo.all(query) do
-      {:ok, cs} -> json(conn, %{})
+    case Repo.all(query) do
+      {:ok, _} -> json(conn, %{})
     end
   end
 
@@ -34,32 +31,64 @@ defmodule PhxCrawlerWeb.CrawlLogController do
     offset = params["offset"] || @offset
 
     query =
-      from mv in PhxCrawler.Movie,
-        where: mv.crawl_log_id == ^id
+      PhxCrawler.Movie
+      |> where([mv], mv.crawl_log_id == ^id)
+      |> join_and_filter_directors(params["director_id"])
+      |> join_and_filter_countries(params["country_id"])
+      |> group_by([mv], mv.id)
 
-        IO.inspect(params)
-        IO.inspect(query)
-    query = Enum.reduce(params, query, fn
-      {"year", year}, qr -> xx = from a in qr, where: a.year == ^year
-                              IO.puts("hello ")
-                              IO.inspect(xx)
-                              xx
-      {"is_complete", is_complete}, qr -> from a in qr, where: a.full_series == ^is_complete
-      _, qr ->  IO.puts("unmatched")
-                # IO.inspect(x)
-                qr
-    end)
+    query =
+      Enum.reduce(params, query, fn
+        {"year", year}, qr ->
+          from a in qr, where: a.year == ^year
+
+        {"is_complete", is_complete}, qr ->
+          from a in qr, where: a.full_series == ^is_complete
+
+        _, qr ->
+          qr
+      end)
+
     IO.inspect(query)
-    total = PhxCrawler.Repo.aggregate(query, :count)
-    data =
-      PhxCrawler.Repo.all(from mv in query,
-        limit: ^limit,
-        offset: ^offset
-      )
+    total = PhxCrawler.Repo.aggregate(from(u in subquery(query)), :count)
 
-    render(conn |> Plug.Conn.put_resp_header("x-total-items", Integer.to_string(total)), "movies.json",
-        movies: data
+    IO.puts("---------------")
+    data =
+      PhxCrawler.Repo.all(
+        from mv in query,
+          limit: ^limit,
+          offset: ^offset
       )
+      |> PhxCrawler.Repo.preload(:directors)
+      |> PhxCrawler.Repo.preload(:countries)
+
+    render(
+      conn |> Plug.Conn.put_resp_header("x-total-items", Integer.to_string(total)),
+      "movies.json",
+      movies: data
+    )
+  end
+
+  defp join_and_filter_directors(query, nil) do
+    from mv in query,
+    left_join: d in assoc(mv, :directors)
+  end
+
+  defp join_and_filter_directors(query, id) do
+    from mv in query,
+    left_join: d in assoc(mv, :directors),
+    where: d.id == ^id
+  end
+
+  defp join_and_filter_countries(query, nil) do
+    from mv in query,
+    left_join: c in assoc(mv, :countries)
+  end
+
+  defp join_and_filter_countries(query, id) do
+    from mv in query,
+    left_join: c in assoc(mv, :countries),
+    where: c.id == ^id
   end
 
   @limit 10
@@ -69,8 +98,19 @@ defmodule PhxCrawlerWeb.CrawlLogController do
     offset = params["offset"] || @offset
 
     total = PhxCrawler.Repo.aggregate(PhxCrawler.CrawlLog, :count)
-    data = PhxCrawler.Repo.all(PhxCrawler.CrawlLog |> limit(^limit) |> offset(^offset))
 
-    render(conn |> Plug.Conn.put_resp_header("x-total-items", Integer.to_string(total)), "crawllogs.json", crawl_logs: data)
+    data =
+      PhxCrawler.Repo.all(
+        PhxCrawler.CrawlLog
+        |> limit(^limit)
+        |> offset(^offset)
+        |> order_by([l], desc: l.crawl_at)
+      )
+
+    render(
+      conn |> Plug.Conn.put_resp_header("x-total-items", Integer.to_string(total)),
+      "crawllogs.json",
+      crawl_logs: data
+    )
   end
 end

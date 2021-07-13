@@ -25,13 +25,14 @@ defmodule PhxCrawlerWeb.Router do
 
   pipeline :api do
     plug :accepts, ["json"]
+
   end
 
   scope "/", PhxCrawlerWeb do
     pipe_through :browser
 
     get "/", HomeController, :index
-    post "/", HomeController, :crawl_by_url
+    post "/", HomeController, :request_crawl
     get "/export", HomeController, :export
     get "/history", CrawlLogController, :fetch
     get "/history/:id", CrawlLogController, :get_by_id

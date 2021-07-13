@@ -50,6 +50,7 @@ defmodule PhxCrawlerWeb.Endpoint do
   plug Plug.MethodOverride
   plug Plug.Head
   plug Plug.Session, @session_options
-  plug Corsica, origins: "*", expose_headers: ~w(x-total-items),  allow_headers: :all, allow_methods: :all, allow_credentials: true
+  #plug Corsica, origins: "*", expose_headers: ~w(x-total-items),  allow_headers: :all, allow_methods: :all, allow_credentials: true
+  plug CORSPlug
   plug PhxCrawlerWeb.Router
 end

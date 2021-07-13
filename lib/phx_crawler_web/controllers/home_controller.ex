@@ -41,17 +41,50 @@ defmodule PhxCrawlerWeb.HomeController do
     end
   end
 
+  @num_pages 10
+  def crawl_job(url) do
+    data = SimpleCrawler.crawl_from_url(@num_pages, url)
+    case persist(data) do
+      {:ok, cs} -> IO.inspect(cs)
+      {:error} -> IO.puts("Error when persist data")
+    end
+  end
+
+  def request_crawl(conn, params) do
+    IO.inspect(params)
+
+    case params do
+      %{"form_data" => %{"url" => url}} ->
+        Task.start(PhxCrawlerWeb.HomeController, :crawl_job, [url])
+        json(conn, %{ok: "Crawler started"})
+
+      %{"file" => %Plug.Upload{filename: _filename, path: path}} ->
+        case File.read(path) do
+          {:ok, lines} ->
+
+              lines
+              |> String.trim_trailing("\n")
+              |> String.split("\n")
+              |> IO.inspect()
+              |> Enum.map(fn link -> Task.start(PhxCrawlerWeb.HomeController, :crawl_job, [link]) end)
+              json(conn, %{ok: "Crawler started"})
+          _ ->
+            json(conn |> put_status(400), %{error: "Readfile error"})
+        end
+    end
+  end
+
   # @base_url  "https://phimmoii.org/the-loai/hoat-hinh/"
   def crawl_by_url(conn, params) do
     IO.inspect(params)
 
     case params do
       %{"form_data" => %{"url" => url}} ->
-        data = SimpleCrawler.crawl_from_url(1, String.trim_trailing(url, ".html") <> "/")
+        data = SimpleCrawler.crawl_from_url(1, url)
 
         case persist(data) do
-          {:ok, _} -> json(conn, %{message: "success"})
-          {:error, _} -> json(conn, %{message: "Intenal error"})
+          {:ok, _cs} -> json(conn, %{message: "success"})
+          _ -> json(conn, %{message: "Intenal error"})
         end
 
       %{"file" => %Plug.Upload{filename: _filename, path: path}} ->
@@ -68,7 +101,7 @@ defmodule PhxCrawlerWeb.HomeController do
                       task =
                         Task.async(SimpleCrawler, :crawl_from_url, [
                           1,
-                          String.trim_trailing(link, ".html") <> "/"
+                          link
                         ])
 
                       IO.puts("starting crawling #{link}")
@@ -100,13 +133,80 @@ defmodule PhxCrawlerWeb.HomeController do
   def persist(result) do
     cvt_result = %{result | movies: Enum.map(result.movies, fn mv -> Map.from_struct(mv) end)}
 
+    IO.puts("----------- INSERT DIRECTORS ---------- ")
+    Enum.map(cvt_result.movies, fn movie -> movie.directors end)
+    |> List.flatten()
+    |> Enum.uniq()
+    |> Enum.map(fn director ->
+      %PhxCrawler.Director{name: director}
+      |> PhxCrawler.Repo.insert(on_conflict: :nothing)
+    end)
+
+    listDirectors = PhxCrawler.Repo.all(PhxCrawler.Director)
+
+    movies_with_directors =
+      cvt_result.movies
+      |> Enum.map(fn movie ->
+        movie_directors =
+          Enum.map(movie.directors, fn director_name ->
+            Enum.find(listDirectors, fn director -> director.name == director_name end)
+          end)
+
+        {movie.title, movie.link, movie_directors}
+      end)
+
+    IO.puts("----------- INSERT COUNTRIES ---------- ")
+    Enum.map(cvt_result.movies, fn movie -> movie.countries end)
+    |> IO.inspect()
+    |> List.flatten()
+    |> Enum.uniq()
+    |> Enum.map(fn country ->
+      %PhxCrawler.Country{name: country}
+      |> PhxCrawler.Repo.insert(on_conflict: :nothing)
+    end)
+
+    listCountries = PhxCrawler.Repo.all(PhxCrawler.Country)
+
+    movies_with_countries =
+      cvt_result.movies
+      |> Enum.map(fn movie ->
+        movie_countries =
+          Enum.map(movie.countries, fn country_name ->
+            Enum.find(listCountries, fn country -> country.name == country_name end)
+          end)
+
+        {movie.title, movie.link, movie_countries}
+      end)
+
+    IO.puts("----------- INSERT CRAWL_LOG && MOVIES ---------- ")
     result_cs =
       PhxCrawler.CrawlLog.changeset(%PhxCrawler.CrawlLog{}, cvt_result)
       |> Ecto.Changeset.cast_assoc(:movies, with: &PhxCrawler.Movie.changeset/2)
 
-    case PhxCrawler.Repo.insert(result_cs) do
-      {:ok, changeset} -> {:ok, changeset}
-      {:error, changeset} -> {:error, changeset}
-    end
+    {:ok, crawl_log} = PhxCrawler.Repo.insert(result_cs)
+
+    IO.puts("----------- INSERT MANY-MANY RELATIONSHIP ---------- ")
+    crawl_log.movies
+    |> Enum.map(fn movie ->
+      {_, _, directors} =
+        Enum.find(movies_with_directors, fn {title, link, _} ->
+          title == movie.title && link == movie.link
+        end)
+
+      Ecto.Changeset.change(movie |> PhxCrawler.Repo.preload(:directors))
+      |> Ecto.Changeset.put_assoc(:directors, directors)
+      |> PhxCrawler.Repo.update(on_conflict: :nothing)
+
+      {_, _, countries} =
+        Enum.find(movies_with_countries, fn {title, link, _} ->
+          title == movie.title && link == movie.link
+        end)
+
+      Ecto.Changeset.change(movie |> PhxCrawler.Repo.preload(:countries))
+      |> Ecto.Changeset.put_assoc(:countries, countries)
+      |> PhxCrawler.Repo.update(on_conflict: :nothing)
+    end)
+
+    {:ok, result_cs}
   end
 end

@@ -12,4 +12,8 @@ defmodule PhxCrawler.Repo.Migrations.CreateCrawlLogs do
     end
 
   end
+
+  def down do
+    drop table(:crawl_logs)
+  end
 end
