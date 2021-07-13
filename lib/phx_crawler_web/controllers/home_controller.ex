@@ -45,7 +45,7 @@ defmodule PhxCrawlerWeb.HomeController do
   def crawl_job(url) do
     data = SimpleCrawler.crawl_from_url(@num_pages, url)
     case persist(data) do
-      {:ok, cs} -> IO.inspect(cs)
+      {:ok, _} -> IO.puts("Persist data successfully")
       {:error} -> IO.puts("Error when persist data")
     end
   end
@@ -65,7 +65,6 @@ defmodule PhxCrawlerWeb.HomeController do
               lines
               |> String.trim_trailing("\n")
               |> String.split("\n")
-              |> IO.inspect()
               |> Enum.map(fn link -> Task.start(PhxCrawlerWeb.HomeController, :crawl_job, [link]) end)
               json(conn, %{ok: "Crawler started"})
           _ ->
@@ -157,7 +156,6 @@ defmodule PhxCrawlerWeb.HomeController do
 
     IO.puts("----------- INSERT COUNTRIES ---------- ")
     Enum.map(cvt_result.movies, fn movie -> movie.countries end)
-    |> IO.inspect()
     |> List.flatten()
     |> Enum.uniq()
     |> Enum.map(fn country ->
